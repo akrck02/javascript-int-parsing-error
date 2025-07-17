@@ -1,0 +1,18 @@
+name: Stable release
+on:
+  push:
+    branches: [main, test/ci]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: akrck02/papiro-deploy@main
+        with:
+          path: "."
+
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4.3.0
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: . # The folder the action should deploy.
