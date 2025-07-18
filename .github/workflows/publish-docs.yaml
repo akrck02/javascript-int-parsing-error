@@ -11,6 +11,9 @@ jobs:
         with:
           path: "."
 
+      - name: View file tree 
+        run: tree -L 3
+        
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4.3.0
         with:
