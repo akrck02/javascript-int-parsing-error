@@ -7,12 +7,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Change permissions
+        run: chmod 766 . -R
+        
       - uses: akrck02/papiro-deploy@main
         with:
           path: "."
-          
-      - name: Change permissions
-        run: chmod 766 . -R
 
       - name: View file tree 
         run: tree
