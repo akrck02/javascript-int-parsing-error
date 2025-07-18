@@ -12,7 +12,7 @@ jobs:
           path: "."
           
       - name: Change permissions
-        run: sudo chmod 766 . -R
+        run: chmod 766 . -R
 
       - name: View file tree 
         run: tree
