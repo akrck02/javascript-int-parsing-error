@@ -13,6 +13,9 @@ jobs:
 
       - name: View file tree 
         run: tree
+
+      - name: View file tree 
+        run: ls -lha resources/wiki
         
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4.3.0
