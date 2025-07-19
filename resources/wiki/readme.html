@@ -1,0 +1,100 @@
+<h1 id="explaining-the-meme">Explaining the meme</h1>
+
+<p>Internet is made of millions of memes flowing everyday, so, devs create a ton of new images showing how their code doesn&rsquo;t work,
+the server is down or even the programming language is broken or annoying. 🤔</p>
+
+<p>This particular meme comes from Javascript enviroments inside web and application development.</p>
+
+<blockquote>
+<p>Javascript lack variable types, so casting, parsing and all that stuff is pretty tough</p>
+</blockquote>
+
+<p>So someone discovered that using the default <strong>parseInt();</strong> function with a number <strong>0.0000005 returns the 5 as result instead of 0.</strong></p>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152199491-4ba0e219-22e4-44a5-9aac-795afa0e0fa9.png" alt="imagen" /></p>
+
+<h2 id="ok-but-how-is-that-even-possible">Ok, but how is that even possible? 💭</h2>
+
+<p>To solve this mistery I make two scripts in <strong>javascript</strong> and <strong>python</strong> that share the same logic.</p>
+
+<blockquote>
+<p>Python uses int() to parse so I use it here. But I realized that the function is protected
+against using a float as an input, showing the following error.</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152200666-28566093-d29f-4c1e-9636-b56e27fb42ac.png" alt="imagen" /></p>
+
+<p>Ok so, thats it, javascript is broken 🔥💔</p>
+
+<h2 id="maybe-this-is-not-that-simple">Maybe this is not that simple.</h2>
+
+<p>Okay so python is protected. But I solve this issue using <strong>float()</strong> function and now is running:</p>
+
+<blockquote>
+<p>Code:</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152201198-c400847e-411c-4622-bef1-99594623530b.png" alt="imagen" /></p>
+
+<blockquote>
+<p>Output:</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152201249-b033c85f-9201-4a7c-a26d-716bf879b882.png" alt="imagen" /></p>
+
+<p>The output is showing, but using <strong>scientific notation</strong></p>
+
+<h2 id="getting-closer-to-the-solution">Getting closer to the solution 💡</h2>
+
+<p>SO! python is using another notation when parsing number is  small enought. <strong>Let&rsquo;s try parsing with parseFloat() in javascript instead.</strong></p>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152201971-fa738c0c-2ad8-43da-9d36-07fe2d00e674.png" alt="imagen" /></p>
+
+<blockquote>
+<p>Excellent! The number is shown in the correct way now. BUT IN <strong>SCIENTIFIC NOTATION</strong></p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152202136-cc27d86c-23c6-49d6-8e8c-ff229cc39a14.png" alt="imagen" /></p>
+
+<h2 id="okay-but-what-s-javascript-doing-inside-the-getint-function">Okay but what&rsquo;s Javascript doing inside the getInt() function? 💻</h2>
+
+<blockquote>
+<p>That&rsquo;s the funny part, it seems that <strong>javascript is using the parseFloat()</strong> function that
+returns <strong>5e-7</strong> and then getting the first numbers before the &lsquo;ilegal characters&rsquo;</p>
+</blockquote>
+
+<p>We can see this behaivour here with the following snipet:</p>
+
+<blockquote>
+<p>Code:</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152203517-e1fcbef1-bfe2-4afe-bc31-a8e16c183cd9.png" alt="imagen" /></p>
+
+<blockquote>
+<p>Output:</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152203608-ac3463e3-77ac-438f-a769-0f7950017658.png" alt="imagen" /></p>
+
+<h2 id="the-conclusion">The conclusion 💬</h2>
+
+<blockquote>
+<p>Using javascript parseInt() to parse a float inside a String is extremelly incorrect.
+You MUST be using parseFloat() and then trunc the number if you want.</p>
+</blockquote>
+
+<p><img src="https://user-images.githubusercontent.com/43274508/152204408-7f3d0e18-9de8-4c58-af7a-81e51a642030.png" alt="imagen" />
+<img src="https://user-images.githubusercontent.com/43274508/152204436-657b24df-6d5b-4581-a588-86d9b95d9f64.png" alt="imagen" /></p>
+
+<blockquote>
+<p>So using the right tools to do the right things, that&rsquo;s the key.</p>
+</blockquote>
+
+<p>How amazing is that?</p>
+
+<p>I hope you enjoy this experiment!🧪</p>
+
+<ul>
+<li>Akrck02</li>
+</ul>
