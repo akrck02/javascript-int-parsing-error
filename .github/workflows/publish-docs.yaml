@@ -11,14 +11,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: akrck02/papiro-deploy@main
         with:
-          title: "title"              # your project title
-          description: "description"  # your project description
-          logo: "./logo.svg"          # your logo path (only svg for now)
-          path: "./your-docs-path"    # the file with your markdown documents
-          isObsidianProject: false    # if it is an obsidian project
-          showFooter: true            # if the footer of the page must be shown
-          showBreadcrumb: true        # if the breadcrumb of the page must be shown
-          showStartPage: true         # if the start page must be shown
+          title: "Int parsing error"
+          description: "Javascript int parsing error explained"        
+          path: "."
+          isObsidianProject: false
+          showFooter: true   
+          showBreadcrumb: true
+          showStartPage: true
       - name: Deploy to github actions 🚀
         uses: JamesIves/github-pages-deploy-action@v4.3.0 # please checkout and give a star to this amazing action.
         with:
