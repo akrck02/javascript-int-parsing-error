@@ -217,7 +217,15 @@
         if (undefined == content)
             return undefined;
         const svg = `<svg height="${size}" width="${size}" viewBox="0 0 24 24" fill="${fill}">${content || ""}</svg>`;
-        return uiComponent({ type: "div", text: svg });
+        return uiComponent({
+            type: "div",
+            text: svg,
+            styles: {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+            },
+        });
     }
 
     function uuidv4() {
@@ -298,6 +306,7 @@
         MaterialIcons["DarkMode"] = "dark_mode";
         MaterialIcons["ContentCopy"] = "content_copy";
         MaterialIcons["MenuOpen"] = "menu_open";
+        MaterialIcons["ExitToApp"] = "exit_to_app";
     })(MaterialIcons || (MaterialIcons = {}));
 
     class PathService {
@@ -419,33 +428,66 @@
         static createOption(route, key, value, level = 0) {
             switch (value.type) {
                 case ItemType.Directory:
-                    const item = this.indexLink(route, key, level);
+                    const item = this.indexLink(route, key, level, false);
+                    const expandIcon = getIcon(IconBundle.Material, MaterialIcons.Expand);
+                    item.appendChild(expandIcon);
                     const container = uiComponent({
-                        classes: [BubbleUI.BoxColumn],
+                        classes: [BubbleUI.BoxColumn, "container"],
+                    });
+                    const itemContainer = uiComponent({
+                        classes: [BubbleUI.BoxColumn, "item-container"],
+                    });
+                    let clicked = false;
+                    setDomEvents(item, {
+                        click: () => {
+                            if (clicked)
+                                return;
+                            clicked = true;
+                            const expansion = container.classList.contains("hidden");
+                            if (expansion) {
+                                container.classList.remove("hidden");
+                                setTimeout(() => {
+                                    itemContainer.style.opacity = "1";
+                                    clicked = false;
+                                }, 10);
+                                return;
+                            }
+                            itemContainer.style.opacity = "0";
+                            setTimeout(() => {
+                                container.classList.toggle("hidden");
+                                clicked = false;
+                            }, 300);
+                        },
                     });
                     container.appendChild(item);
                     for (const key in value.files) {
-                        container.appendChild(this.createOption(`${route}/${key}`.toLocaleLowerCase(), key, value.files[key], level + 1));
+                        itemContainer.appendChild(this.createOption(`${route}/${key}`.toLocaleLowerCase(), key, value.files[key], level + 1));
                     }
+                    container.appendChild(itemContainer);
                     return container;
                 case ItemType.File:
-                    return this.indexLink(route, key, level);
+                    return this.indexLink(route, key, level, true);
             }
         }
-        static indexLink(route, name, level) {
+        static indexLink(route, name, level, isFile) {
             name = PathService.getPascalCase(name);
             const text = PathService.decodeCustomUrl(name);
             const item = uiComponent({
                 type: Html.A,
                 id: this.INDEX_LINK_ID,
-                classes: [BubbleUI.BoxRow, BubbleUI.BoxYCenter, "hover-primary"],
-                text: text,
+                classes: [BubbleUI.BoxRow, BubbleUI.BoxYCenter],
+                text: PathService.getPascalCase(text),
                 styles: { paddingLeft: `${2 + level}rem` },
                 selectable: false,
                 data: {
                     route: route,
                 },
             });
+            // if it is a Directory, return
+            if (!isFile) {
+                return item;
+            }
+            item.classList.add("file");
             if (null != route) {
                 setDomAttributes(item, {
                     href: PathService.getWikiViewRoute(route),
@@ -468,6 +510,17 @@
                     link.classList.remove(this.LINK_SELECTED_CLASS);
             });
         }
+        static setFirstAsSelected() {
+            let found = false;
+            document.querySelectorAll(`#${this.INDEX_LINK_ID}`).forEach((link) => {
+                if (!found) {
+                    link.classList.add(this.LINK_SELECTED_CLASS);
+                    found = true;
+                }
+                else
+                    link.classList.remove(this.LINK_SELECTED_CLASS);
+            });
+        }
     }
     IndexMenu.ID = "index-menu";
     IndexMenu.TITLE_ID = "title";
@@ -475,182 +528,307 @@
     IndexMenu.LINK_SELECTED_CLASS = "selected";
     IndexMenu.MENU_TOGGLE_SIGNAL = setSignal();
 
-    class TopBar {
-        static create() {
-            const topBar = uiComponent({
-                type: Html.Header,
-                id: TopBar.ID,
-                classes: [BubbleUI.BoxRow, BubbleUI.BoxXBetween, BubbleUI.BoxYCenter],
-            });
-            const logo = uiComponent({
-                type: Html.Img,
-                id: TopBar.LOGO_ID,
-                attributes: {
-                    src: `${getConfiguration(AppConfigurations.Path)[PathConfigurations.Icons]}/logo.svg`,
-                },
-            });
-            const navTitle = uiComponent({
-                type: Html.A,
-                id: TopBar.TITLE_ID,
-                text: logo.outerHTML + getConfiguration(AppConfigurations.AppName),
-                attributes: {
-                    href: `${PathService.getWebUrl()}/#/`,
-                },
-                classes: [BubbleUI.BoxRow, BubbleUI.BoxXStart, BubbleUI.BoxYCenter],
-            });
-            topBar.appendChild(navTitle);
-            const iconBar = uiComponent({
-                type: Html.Div,
-                id: TopBar.ICON_BAR_ID,
-                classes: [BubbleUI.BoxRow, BubbleUI.BoxXEnd],
-            });
-            topBar.appendChild(iconBar);
-            const themeIconButton = uiComponent({
-                id: TopBar.THEME_ICON_ID,
-                styles: { cursor: "pointer" },
-            });
-            let themeIcon = getIcon(IconBundle.Material, Theme.isDark() ? MaterialIcons.LightMode : MaterialIcons.DarkMode);
-            themeIconButton.appendChild(themeIcon);
-            iconBar.appendChild(themeIconButton);
-            connectToSignal(THEME_CHANGED_SIGNAL, async () => {
-                themeIcon = getIcon(IconBundle.Material, Theme.isDark() ? MaterialIcons.LightMode : MaterialIcons.DarkMode);
-                themeIconButton.innerHTML = themeIcon?.innerHTML;
-            });
-            setDomEvents(themeIconButton, {
-                click: (e) => Theme.toggle(),
-            });
-            const showMenuIcon = getIcon(IconBundle.Material, MaterialIcons.MenuOpen);
-            showMenuIcon.id = TopBar.MENU_ICON_ID;
-            iconBar.appendChild(showMenuIcon);
-            const searchIcon = getIcon(IconBundle.Material, MaterialIcons.Search);
-            iconBar.appendChild(searchIcon);
-            setDomEvents(showMenuIcon, {
-                click: (e) => emitSignal(IndexMenu.MENU_TOGGLE_SIGNAL, {}),
-            });
-            return topBar;
+    var KeyInteraction;
+    (function (KeyInteraction) {
+        KeyInteraction["keyUp"] = "keyup";
+        KeyInteraction["keyDown"] = "keydown";
+    })(KeyInteraction || (KeyInteraction = {}));
+    /**
+     *  Public class to register shortcuts by context
+     */
+    class Shortcuts {
+        static register(element) {
+            const uuid = uuidv4();
+            this.globalRegistry.set(uuid, new ShortcutRegistry(element));
+            return uuid;
+        }
+        static set(key, shortcut) {
+            this.globalRegistry.get(key)?.set(shortcut);
         }
     }
-    TopBar.ID = "top-bar";
-    TopBar.LOGO_ID = "logo";
-    TopBar.TITLE_ID = "title";
-    TopBar.ICON_BAR_ID = "icon-bar-id";
-    TopBar.THEME_ICON_ID = "theme-icon";
-    TopBar.MENU_ICON_ID = "menu-icon";
-
-    const SMALL_DEVICE_WIDTH = 760;
-    const MEDIUM_DEVICE_WIDTH = 1024;
+    Shortcuts.globalRegistry = new Map();
     /**
-    * Get if the device is a small device
-    * @returns True if the device is a small device
-    */
-    function isSmallDevice() {
-        return window.matchMedia(`only screen and (max-width: ${SMALL_DEVICE_WIDTH}px)`).matches;
-    }
-    /**
-    * Get if the device is a medium device
-    * @returns True if the device is a medium device
-    */
-    function isMediumDevice() {
-        return window.matchMedia(`only screen and (min-width: ${SMALL_DEVICE_WIDTH}px) and (max-width: ${MEDIUM_DEVICE_WIDTH}px)`).matches;
-    }
-    /**
-    * Get if matches one of the mobile media queries
-    * @returns True if the device is a mobile device
-    */
-    function isMobile() {
-        return (navigator.userAgent.match(/Android/i) ||
-            navigator.userAgent.match(/BlackBerry/i) ||
-            navigator.userAgent.match(/iPhone|iPad|iPod/i) ||
-            navigator.userAgent.match(/Opera Mini/i) ||
-            navigator.userAgent.match(/IEMobile/i));
-    }
-
-    class Display {
-        static checkType() {
-            if (isMobile() || isSmallDevice() || isMediumDevice()) {
-                setDomDataset(document.documentElement, {
-                    display: "mobile"
-                });
-                setConfiguration("display", "mobile");
+     * Shortcut registry from a given handler
+     */
+    class ShortcutRegistry {
+        constructor(context) {
+            this.registry = new Map();
+            this.context = context;
+            this.start();
+        }
+        /**
+         * Get event as key string
+         * @param event the keyboard event
+         * @returns event as key string
+         */
+        static getEventKeys(event) {
+            const parts = [];
+            if (event.ctrlKey)
+                parts.push("Ctrl");
+            if (event.shiftKey)
+                parts.push("Shift");
+            if (event.altKey)
+                parts.push("Alt");
+            if (event.metaKey)
+                parts.push("Meta"); // Para Cmd en Mac
+            if (!["Control", "Shift", "Alt", "Meta"].includes(event.key)) {
+                parts.push(event.key.toUpperCase());
+            }
+            return parts.join("+");
+        }
+        /**
+         * Get shortcut as key string
+         * @param shortcut the shortcut
+         * @returns shortcut as key string
+         */
+        static getShortcutKeys(shortcut) {
+            const parts = [];
+            if (shortcut.ctrlKey)
+                parts.push("Ctrl");
+            if (shortcut.shiftKey)
+                parts.push("Shift");
+            if (shortcut.altKey)
+                parts.push("Alt");
+            if (shortcut.metaKey)
+                parts.push("Meta");
+            parts.push(shortcut.key.toUpperCase());
+            return parts.join("+");
+        }
+        /**
+         * Execute a shotcut action
+         * @param action the action
+         */
+        static execute(action) {
+            if (undefined == action || undefined == action.callback)
+                return;
+            action.callback();
+        }
+        /**
+         * Set a new action for a shortcut
+         * @param shortcut the shortcut
+         */
+        set(shortcut) {
+            this.registry.set(ShortcutRegistry.getShortcutKeys(shortcut), shortcut);
+        }
+        /**
+         * Start keyboard service
+         */
+        start() {
+            const registry = this.registry;
+            this.context.addEventListener(KeyInteraction.keyUp, (e) => ShortcutRegistry.handleEvent(KeyInteraction.keyUp, registry, e));
+            this.context.addEventListener(KeyInteraction.keyDown, (e) => ShortcutRegistry.handleEvent(KeyInteraction.keyDown, registry, e));
+        }
+        /**
+         * Handle a key event
+         * @param event the key event
+         */
+        static handleEvent(context, registry, event) {
+            // get action, if no one is present return
+            const action = registry?.get(ShortcutRegistry.getEventKeys(event));
+            if (undefined == action || context != action.interaction)
+                return;
+            // if prevent default active, prevent
+            if (true == action.preventDefault) {
+                event.preventDefault();
+            }
+            // if stop stop propagation active, prevent
+            if (true == action.stopPropagation) {
+                event.stopPropagation();
+            }
+            if (!action.repeatable && event.repeat)
+                // handle not repeatable events
+                return;
+            // if omit editable content is set check if editable
+            const target = event.target;
+            if (action.omitEditableContent == true &&
+                ShortcutRegistry.isEditableContent(target)) {
                 return;
             }
-            setDomDataset(document.documentElement, {
-                display: "desktop"
-            });
-            setConfiguration("display", "desktop");
+            this.execute(action);
         }
-        static isMobile() {
-            return "mobile" == getConfiguration("display");
+        /**
+         * Get if target is editable
+         * @param target the element to inspect
+         * @returns if target is editable
+         */
+        static isEditableContent(target) {
+            return (target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.isContentEditable);
         }
     }
 
-    const paths = new Map();
-    let homeHandler = async (_p, c) => { c.innerHTML = "Home page."; };
-    let notFoundHandler = async (_p, c) => { c.innerHTML = "Page not found."; };
-    /**
-     * Register a new route.
-     * @param path The router path
-     * @param handler The route handler
-     */
-    function setRoute(path, handler) {
-        // If the path is empry return 
-        if (undefined == path)
-            return;
-        // If the path is blank or /, register home and return
-        path = path.trim();
-        // If the path is home
-        if ("/" == path || "" == path) {
-            homeHandler = handler;
-            return;
+    class GlobalShortcuts {
+        static set(shortcut) {
+            Shortcuts.set(this.REGISTRY, shortcut);
         }
-        // If the path ends with / trim it
-        const indexOfSlash = path.indexOf("/");
-        if (-1 != indexOfSlash && "/" == path.substring(path.length - 1))
-            path = path.substring(0, path.length - 1);
-        // Replace all the variables with regex expressions to capture them later
-        const regexp = /\/(\$+)/g;
-        path = path.replaceAll(regexp, "/([^\/]+)");
-        paths.set(path, handler);
-        console.debug(`Set route ${path}`);
     }
-    /**
-     * Show view for the given route.
-     * @param path The given path to search for
-     * @param container The container to display the views in
-     */
-    function showRoute(path, container) {
-        container.innerHTML = "";
-        // If it is the home route, show
-        if ("/" == path || "" == path) {
-            homeHandler([], container);
-            return;
-        }
-        // Else search matching route
-        const keys = Array.from(paths.keys()).sort(compareRouteLength);
-        for (const route of keys) {
-            // Check if route matches
-            const regexp = RegExp(route);
-            const params = path.match(regexp);
-            if (null != params && 0 != params.length) {
-                paths.get(route)(params.slice(1), container);
-                return;
+    GlobalShortcuts.REGISTRY = Shortcuts.register(document.documentElement);
+
+    class StringService {
+        static levenshteinDistance(a, b) {
+            const an = a.length;
+            const bn = b.length;
+            if (an == 0) {
+                return bn;
             }
+            if (bn == 0) {
+                return an;
+            }
+            const matrix = new Array(bn + 1);
+            for (let i = 0; i <= bn; ++i) {
+                const row = (matrix[i] = new Array(an + 1));
+                row[0] = i;
+            }
+            const firstRow = matrix[0];
+            for (let j = 1; j <= an; ++j) {
+                firstRow[j] = j;
+            }
+            for (let i = 1; i <= bn; ++i) {
+                for (let j = 1; j <= an; ++j) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    }
+                    else {
+                        matrix[i][j] =
+                            Math.min(matrix[i - 1][j - 1], // substitution
+                            matrix[i][j - 1], // insertion
+                            matrix[i - 1][j]) + 1;
+                    }
+                }
+            }
+            return matrix[bn][an];
         }
-        // If no route found, show not found view.
-        notFoundHandler([], container);
+        /**
+         * Get if the text contains the searcher with typo tolerance
+         * @param text The text to search in
+         * @param query The text to search for
+         * @returns True if the text contains the searcher
+         */
+        static search(text, query) {
+            return StringService.searchWithTolerance(text, query, StringService.DEFAULT_TOLERANCE);
+        }
+        /**
+         * Get if the text contains the searcher with typo tolerance
+         * @param text The text to search in
+         * @param query The text to search for
+         * @param tolerance The tolerance to use
+         * @returns True if the text contains the searcher
+         */
+        static containsMatchingWordWithTolerance(text, query, tolerance) {
+            text = PathService.decodeCustomUrl(StringService.normalized(text.trim().replaceAll(" ", "").toUpperCase())).toUpperCase();
+            query = StringService.normalized(query.trim().replaceAll(" ", "").toUpperCase()).toUpperCase();
+            if (text == query || text.includes(query))
+                return true;
+            if (StringService.levenshteinDistance(query, text) < tolerance)
+                return true;
+            let matchesTolerance = false;
+            const words = text.split(/\s/);
+            for (const word of words) {
+                if (StringService.levenshteinDistance(query, word) < tolerance) {
+                    return true;
+                }
+            }
+            return matchesTolerance;
+        }
+        /**
+         * Get if the text contains the searcher with typo tolerance
+         * @param text The text to search in
+         * @param query The text to search for
+         * @param tolerance The tolerance to use
+         * @returns True if the text contains the searcher
+         */
+        static searchWithTolerance(text, query, tolerance) {
+            text = text.trim();
+            query = query.trim();
+            if (text.toUpperCase().includes(query.toUpperCase())) {
+                return true;
+            }
+            const words = query.split(/\s/);
+            let matching = words.some((word) => this.containsMatchingWordWithTolerance(text, word, tolerance));
+            return matching;
+        }
+        /**
+         * Returns a word matching with typo tolerance
+         * @param text The text to search in
+         * @param query The word to search for
+         * @param tolerance The tolerance to use
+         * @return
+         */
+        static getMatching(text, query, tolerance) {
+            text = text.trim();
+            query = query.trim();
+            const matches = [];
+            if (text.toUpperCase().includes(query.toUpperCase())) {
+                matches.push(query);
+                return matches;
+            }
+            const words = text.split(/\s/);
+            words.forEach((word) => {
+                const matching = this.getMatchingWord(text, word, tolerance);
+                if (matching != null) {
+                    matches.push(matching);
+                }
+            });
+            return matches;
+        }
+        /**
+         * Returns a word matching with typo tolerance
+         * @param text The text to search in
+         * @param searcher The word to search for
+         * @param tolerance The tolerance to use
+         * @return
+         */
+        static getMatchingWord(text, searcher, tolerance) {
+            const words = text.split(/\s/);
+            let matchingWord = "";
+            words.find((word) => StringService.normalized(word)
+                .toUpperCase()
+                .includes(searcher.toUpperCase()) ||
+                StringService.levenshteinDistance(StringService.normalized(searcher).toUpperCase(), StringService.normalized(word).toUpperCase()) < tolerance);
+            return matchingWord;
+        }
+        /**
+         * Get normalized text (no accents)
+         * @param text
+         * @return the text without accents
+         */
+        static normalized(text) {
+            const sensible = [
+                "\u00C1",
+                "\u00C9",
+                "\u00CD",
+                "\u00D3",
+                "\u00DA",
+                "\u00D1",
+                "\u00E1",
+                "\u00E9",
+                "\u00ED",
+                "\u00F3",
+                "\u00FA",
+                "\u00F1",
+            ];
+            const normalized = [
+                "A",
+                "E",
+                "I",
+                "O",
+                "U",
+                "N",
+                "a",
+                "e",
+                "i",
+                "o",
+                "u",
+                "n",
+            ];
+            for (let i = 0; i < normalized.length; i++) {
+                text = text.replaceAll(sensible[i], normalized[i]);
+            }
+            return text;
+        }
     }
-    /**
-     * Compare the length of two routes
-     */
-    function compareRouteLength(a, b) {
-        const aLength = a.split("/").length - 1;
-        const bLength = b.split("/").length - 1;
-        if (aLength == bLength)
-            return 0;
-        if (aLength < bLength)
-            return 1;
-        return -1;
-    }
+    StringService.DEFAULT_TOLERANCE = 2;
 
     /**
      * This enum represents the available HTTP methods
@@ -2138,6 +2316,463 @@ ${body}</tbody>
         }
     }
 
+    /**
+     * Search modal component, this class is a singleton
+     * it will be instanciated when the first call to "create"
+     * is executed, the following calls will inmediately return
+     * the current instance.
+     */
+    class Search {
+        /**
+         * Create the shortcut component or get current instance if exists
+         * @returns the component
+         */
+        static create() {
+            if (null != this.instance)
+                return this.instance;
+            this.instance = uiComponent({
+                id: this.ID,
+                classes: [BubbleUI.BoxColumn, BubbleUI.BoxYCenter, "hidden"],
+            });
+            const searchToolbar = uiComponent({
+                id: this.SEARCH_TOOLBAR_ID,
+                classes: [BubbleUI.BoxCenter],
+            });
+            this.searchBar = uiComponent({
+                type: Html.Input,
+                id: this.SEARCHBAR_ID,
+                attributes: {
+                    placeholder: "Search here...",
+                },
+            });
+            searchToolbar.appendChild(this.searchBar);
+            this.exitButton = uiComponent({
+                type: Html.Button,
+                text: getIcon(IconBundle.Material, MaterialIcons.ExitToApp, "", "")
+                    .outerHTML,
+            });
+            this.exitButton.onclick = () => Search.exit();
+            const exitButtonShortcutUuid = Shortcuts.register(this.exitButton);
+            Shortcuts.set(exitButtonShortcutUuid, {
+                key: "ARROWLEFT",
+                interaction: KeyInteraction.keyUp,
+                callback: () => Search.searchBar.focus(),
+            });
+            searchToolbar.appendChild(this.exitButton);
+            this.instance.appendChild(searchToolbar);
+            const separator = uiComponent({ type: Html.Hr });
+            this.instance.appendChild(separator);
+            this.resultContainer = uiComponent({
+                id: this.RESULTS_ID,
+                classes: [BubbleUI.BoxColumn, BubbleUI.BoxYCenter],
+            });
+            this.instance.appendChild(this.resultContainer);
+            this.setSearchShortcuts();
+            return this.instance;
+        }
+        /**
+         * Set search shortcuts
+         */
+        static setSearchShortcuts() {
+            GlobalShortcuts.set({
+                interaction: KeyInteraction.keyUp,
+                key: "f",
+                shiftKey: true,
+                callback: () => Search.toggle(),
+                repeatable: false,
+                omitEditableContent: true,
+            });
+            const searchShortcutRegistry = Shortcuts.register(this.instance);
+            Shortcuts.set(searchShortcutRegistry, {
+                interaction: KeyInteraction.keyUp,
+                key: "ESCAPE",
+                callback: () => {
+                    Search.exit();
+                },
+            });
+            setDomEvents(this.searchBar, {
+                keyup: (e) => {
+                    if (e.key?.toUpperCase() == "ARROWUP") {
+                        Search.selectionIndex = Search.results.length - 1;
+                        Search.results[Search.selectionIndex]?.focus();
+                        return;
+                    }
+                    if (e.key?.toUpperCase() == "ARROWDOWN") {
+                        Search.selectionIndex = 0;
+                        Search.results[Search.selectionIndex]?.focus();
+                        return;
+                    }
+                    Search.search(Search.searchBar.value);
+                },
+            });
+        }
+        /**
+         *
+         * @param query
+         * @returns
+         */
+        static search(query) {
+            const links = [];
+            this.results = [];
+            this.selectionIndex = 0;
+            // Get search results
+            for (const itemName in WikiService.index.files) {
+                this.searchLinks(links, query, itemName, itemName, WikiService.index.files[itemName]);
+            }
+            // If no elements present, show a message
+            this.resultContainer.innerHTML = "";
+            if (0 == links.length) {
+                this.resultContainer.appendChild(uiComponent({
+                    type: Html.P,
+                    text: "No elements.",
+                }));
+                return;
+            }
+            for (const i in links) {
+                const selectable = this.createSelectableLink(links[i]);
+                this.results.push(selectable);
+                this.resultContainer.appendChild(selectable);
+            }
+        }
+        /**
+         * Create a selectable link with custom shortcuts
+         * @param link The link data
+         * @returns The html <a> element
+         */
+        static createSelectableLink(link) {
+            const selectable = uiComponent({
+                type: Html.A,
+                text: link.name,
+                attributes: {
+                    href: PathService.getWikiViewRoute(link.path),
+                },
+            });
+            selectable.onclick = () => {
+                Search.selectionIndex = 0;
+                Search.exit();
+            };
+            const uuid = Shortcuts.register(selectable);
+            Shortcuts.set(uuid, {
+                key: "ESCAPE",
+                interaction: KeyInteraction.keyUp,
+                callback: () => {
+                    Search.selectionIndex = 0;
+                    Search.exit();
+                },
+            });
+            Shortcuts.set(uuid, {
+                key: "ARROWUP",
+                interaction: KeyInteraction.keyUp,
+                callback: () => {
+                    Search.selectionIndex--;
+                    if (Search.selectionIndex < 0) {
+                        Search.searchBar.focus();
+                        this.selectionIndex = 0;
+                        return;
+                    }
+                    Search.results[Search.selectionIndex].focus();
+                },
+            });
+            Shortcuts.set(uuid, {
+                key: "ARROWDOWN",
+                interaction: KeyInteraction.keyUp,
+                callback: () => {
+                    Search.selectionIndex++;
+                    if (Search.selectionIndex == Search.results.length) {
+                        Search.selectionIndex = 0;
+                        Search.searchBar.focus();
+                        return;
+                    }
+                    Search.results[Search.selectionIndex].focus();
+                },
+            });
+            return selectable;
+        }
+        /**
+         * Search links for the given query
+         * @param links The link list to fill
+         * @param query The query to match
+         * @param name The link name
+         * @param route The link route
+         * @param item The index item matching the route
+         */
+        static searchLinks(links, query, name, route, item) {
+            // if no valid params, return
+            if (undefined == query ||
+                undefined == name ||
+                undefined == item ||
+                undefined == links)
+                return;
+            // if it is a file, return
+            if (ItemType.File == item.type) {
+                // if the query does not match, do no add to search results
+                if (false == this.queryMatches(name, query))
+                    return;
+                // add file to search results
+                links.push({
+                    name: PathService.getPascalCase(PathService.decodeCustomUrl(name)),
+                    path: `${route}`,
+                });
+                return;
+            }
+            else {
+                // if the query matches add file to search results
+                if (item.path.endsWith(".html") &&
+                    true == this.queryMatches(name, query)) {
+                    links.push({
+                        name: PathService.getPascalCase(PathService.decodeCustomUrl(name)),
+                        path: `${route}`,
+                    });
+                }
+                // if it is a directory, search for the matching contents inside
+                for (const childName in item.files) {
+                    this.searchLinks(links, query, childName, `${route}/${childName}`, item.files[childName]);
+                }
+            }
+        }
+        /**
+         * Get if the given value matches the query
+         * @param value The value to inspect
+         * @param query The query to match
+         * @returns if the given value matches the query
+         */
+        static queryMatches(value, query) {
+            return StringService.search(value, query);
+        }
+        /**
+         * Toggle the search modal
+         */
+        static toggle() {
+            if (null == this.instance)
+                return;
+            if (this.instance.classList.contains("hidden"))
+                this.open();
+            else
+                this.exit();
+        }
+        /**
+         * Open the search modal
+         */
+        static open() {
+            if (null == this.instance)
+                return;
+            this.instance.classList.remove("hidden");
+            this.searchBar.focus();
+        }
+        /**
+         * exit the search modal
+         */
+        static exit() {
+            if (null == this.instance)
+                return;
+            this.instance.classList.add("hidden");
+            this.searchBar.value = "";
+        }
+    }
+    Search.ID = "search-modal";
+    Search.SEARCH_TOOLBAR_ID = "search-toolbar";
+    Search.SEARCHBAR_ID = "searchbar";
+    Search.RESULTS_ID = "results";
+    Search.results = [];
+    Search.selectionIndex = 0;
+
+    class TopBar {
+        static create() {
+            const topBar = uiComponent({
+                type: Html.Header,
+                id: TopBar.ID,
+                classes: [BubbleUI.BoxRow, BubbleUI.BoxXBetween, BubbleUI.BoxYCenter],
+            });
+            const logo = uiComponent({
+                type: Html.Img,
+                id: TopBar.LOGO_ID,
+                attributes: {
+                    src: `${getConfiguration(AppConfigurations.Path)[PathConfigurations.Icons]}/logo.svg`,
+                },
+            });
+            const navTitle = uiComponent({
+                type: Html.A,
+                id: TopBar.TITLE_ID,
+                text: logo.outerHTML + getConfiguration(AppConfigurations.AppName),
+                attributes: {
+                    href: `${PathService.getWebUrl()}#/`,
+                },
+                classes: [BubbleUI.BoxRow, BubbleUI.BoxXStart, BubbleUI.BoxYCenter],
+            });
+            topBar.appendChild(navTitle);
+            const iconBar = uiComponent({
+                type: Html.Div,
+                id: TopBar.ICON_BAR_ID,
+                classes: [BubbleUI.BoxRow, BubbleUI.BoxXEnd],
+            });
+            topBar.appendChild(iconBar);
+            const themeIconButton = uiComponent({
+                id: TopBar.THEME_ICON_ID,
+                styles: { cursor: "pointer" },
+            });
+            let themeIcon = getIcon(IconBundle.Material, Theme.isDark() ? MaterialIcons.LightMode : MaterialIcons.DarkMode);
+            themeIconButton.appendChild(themeIcon);
+            iconBar.appendChild(themeIconButton);
+            connectToSignal(THEME_CHANGED_SIGNAL, async () => {
+                themeIcon = getIcon(IconBundle.Material, Theme.isDark() ? MaterialIcons.LightMode : MaterialIcons.DarkMode);
+                themeIconButton.innerHTML = themeIcon?.innerHTML;
+            });
+            setDomEvents(themeIconButton, {
+                click: (e) => Theme.toggle(),
+            });
+            const showMenuIcon = getIcon(IconBundle.Material, MaterialIcons.MenuOpen);
+            showMenuIcon.id = TopBar.MENU_ICON_ID;
+            iconBar.appendChild(showMenuIcon);
+            setDomEvents(showMenuIcon, {
+                click: (e) => emitSignal(IndexMenu.MENU_TOGGLE_SIGNAL, {}),
+            });
+            const searchIcon = getIcon(IconBundle.Material, MaterialIcons.Search);
+            iconBar.appendChild(searchIcon);
+            setDomEvents(searchIcon, {
+                click: (e) => Search.toggle(),
+            });
+            return topBar;
+        }
+    }
+    TopBar.ID = "top-bar";
+    TopBar.LOGO_ID = "logo";
+    TopBar.TITLE_ID = "title";
+    TopBar.ICON_BAR_ID = "icon-bar-id";
+    TopBar.THEME_ICON_ID = "theme-icon";
+    TopBar.MENU_ICON_ID = "menu-icon";
+
+    const SMALL_DEVICE_WIDTH = 760;
+    const MEDIUM_DEVICE_WIDTH = 1024;
+    /**
+    * Get if the device is a small device
+    * @returns True if the device is a small device
+    */
+    function isSmallDevice() {
+        return window.matchMedia(`only screen and (max-width: ${SMALL_DEVICE_WIDTH}px)`).matches;
+    }
+    /**
+    * Get if the device is a medium device
+    * @returns True if the device is a medium device
+    */
+    function isMediumDevice() {
+        return window.matchMedia(`only screen and (min-width: ${SMALL_DEVICE_WIDTH}px) and (max-width: ${MEDIUM_DEVICE_WIDTH}px)`).matches;
+    }
+    /**
+    * Get if matches one of the mobile media queries
+    * @returns True if the device is a mobile device
+    */
+    function isMobile() {
+        return (navigator.userAgent.match(/Android/i) ||
+            navigator.userAgent.match(/BlackBerry/i) ||
+            navigator.userAgent.match(/iPhone|iPad|iPod/i) ||
+            navigator.userAgent.match(/Opera Mini/i) ||
+            navigator.userAgent.match(/IEMobile/i));
+    }
+
+    class Display {
+        static checkType() {
+            if (isMobile() || isSmallDevice() || isMediumDevice()) {
+                setDomDataset(document.documentElement, {
+                    display: "mobile"
+                });
+                setConfiguration("display", "mobile");
+                return;
+            }
+            setDomDataset(document.documentElement, {
+                display: "desktop"
+            });
+            setConfiguration("display", "desktop");
+        }
+        static isMobile() {
+            return "mobile" == getConfiguration("display");
+        }
+    }
+
+    const paths = new Map();
+    let homeHandler = async (_p, c) => {
+        c.innerHTML = "Home page.";
+    };
+    let notFoundHandler = async (_p, c) => {
+        c.innerHTML = "Page not found.";
+    };
+    /**
+     * Register a new route.
+     * @param path The router path
+     * @param handler The route handler
+     */
+    function setRoute(path, handler) {
+        // If the path is empry return
+        if (undefined == path)
+            return;
+        // If the path is blank or /, register home and return
+        path = path.trim();
+        // If the path is home
+        if ("/" == path || "" == path) {
+            homeHandler = handler;
+            return;
+        }
+        // If the path ends with / trim it
+        const indexOfSlash = path.indexOf("/");
+        if (-1 != indexOfSlash && "/" == path.substring(path.length - 1))
+            path = path.substring(0, path.length - 1);
+        // Replace all the variables with regex expressions to capture them later
+        const regexp = /\/(\$+)/g;
+        path = path.replaceAll(regexp, "/([^\/]+)");
+        paths.set(path, handler);
+    }
+    /**
+     * Register the route to display when route path is not found.
+     * @param handler The view handler to call
+     */
+    function setNotFoundRoute(handler) {
+        notFoundHandler = handler;
+    }
+    /**
+     * Register the route to displayon home.
+     * @param handler The view handler to call
+     */
+    function setHomeRoute(handler) {
+        homeHandler = handler;
+    }
+    /**
+     * Show view for the given route.
+     * @param path The given path to search for
+     * @param container The container to display the views in
+     */
+    function showRoute(path, container) {
+        container.innerHTML = "";
+        // If it is the home route, show
+        if ("/" == path || "" == path) {
+            homeHandler([], container);
+            return;
+        }
+        // Else search matching route
+        const keys = Array.from(paths.keys()).sort(compareRouteLength);
+        for (const route of keys) {
+            // Check if route matches
+            const regexp = RegExp(route);
+            const params = path.match(regexp);
+            if (null != params && 0 != params.length) {
+                paths.get(route)(params.slice(1), container);
+                return;
+            }
+        }
+        // If no route found, show not found view.
+        notFoundHandler([], container);
+    }
+    /**
+     * Compare the length of two routes
+     */
+    function compareRouteLength(a, b) {
+        const aLength = a.split("/").length - 1;
+        const bLength = b.split("/").length - 1;
+        if (aLength == bLength)
+            return 0;
+        if (aLength < bLength)
+            return 1;
+        return -1;
+    }
+
     class HomeView {
         /**
          * Show home view
@@ -2194,6 +2829,46 @@ ${body}</tbody>
     HomeView.TITLE_ID = "title";
     HomeView.SUBTITLE_ID = "subtitle";
     HomeView.EXPLORE_LINK_ID = "explore";
+
+    class NotFound {
+        static async show(params, container) {
+            const errorView = uiComponent({
+                type: Html.View,
+                id: NotFound.id,
+                classes: [BubbleUI.BoxColumn, BubbleUI.BoxCenter],
+                styles: {
+                    height: "100%",
+                    width: "100%",
+                },
+            });
+            const icon = getIcon(IconBundle.Material, MaterialIcons.Search, "10rem", "var(--surface-3)");
+            errorView.appendChild(icon);
+            const h1 = uiComponent({
+                type: Html.H1,
+                text: "Page not found",
+                styles: {
+                    color: "var(--surface-3)",
+                },
+            });
+            errorView.appendChild(h1);
+            const homeButton = uiComponent({
+                type: Html.Button,
+                text: "Return home",
+                styles: {
+                    marginTop: "1.5rem",
+                    color: "var(--on-surface-2)",
+                },
+            });
+            errorView.appendChild(homeButton);
+            setDomEvents(homeButton, {
+                click: () => {
+                    location.href = `${PathService.getWebUrl()}#`;
+                },
+            });
+            container.appendChild(errorView);
+        }
+    }
+    NotFound.id = "not-found";
 
     class Breadcrumb {
         static create(route, index) {
@@ -2291,6 +2966,20 @@ ${body}</tbody>
                     aHtml.href = PathService.getWikiViewRoute(newUrl);
                 }
             });
+            markdownCanvas.querySelectorAll("pre code").forEach((code) => {
+                const codeHtml = code;
+                const copyButton = uiComponent({
+                    type: Html.Button,
+                    classes: ["copy-button"],
+                    text: getIcon(IconBundle.Material, MaterialIcons.ContentCopy, "1rem", "var(--surface-6)").outerHTML,
+                });
+                setDomEvents(copyButton, {
+                    click: () => {
+                        navigator.clipboard.writeText(codeHtml.innerText);
+                    },
+                });
+                codeHtml.appendChild(copyButton);
+            });
             return markdownCanvas;
         }
     }
@@ -2324,9 +3013,11 @@ ${body}</tbody>
         static async getDocumentHTML(route, index) {
             // If it is the home
             if ("" == route.trim()) {
-                if (undefined == index.files["home"])
-                    return "";
-                route = "home";
+                route = Object.keys(index.files)[0];
+                IndexMenu.setFirstAsSelected();
+            }
+            else {
+                IndexMenu.setSelectedRoute();
             }
             const indexItem = getIndexItemFromRoute(index, route);
             // if it is a directory show a index
@@ -2337,11 +3028,14 @@ ${body}</tbody>
             return WikiService.getDocumentHTML(PathService.getFullWikiResourcePath(PathService.createUrl([routeWithoutLastSection, indexItem.path])));
         }
         static createIndex(route, indexItem) {
-            const index = uiComponent({});
+            const index = uiComponent({
+                classes: ["index-page"],
+            });
             const title = uiComponent({
                 type: Html.H1,
                 text: `${route}`,
             });
+            const separator = uiComponent({ type: Html.Hr });
             const list = uiComponent({ type: Html.Ul });
             for (const key in indexItem.files) {
                 const listItem = uiComponent({ type: Html.Li });
@@ -2356,6 +3050,7 @@ ${body}</tbody>
                 list.appendChild(listItem);
             }
             index.appendChild(title);
+            index.appendChild(separator);
             index.appendChild(list);
             return index.outerHTML;
         }
@@ -2389,6 +3084,8 @@ ${body}</tbody>
         // create top bar
         const topBar = TopBar.create();
         document.body.appendChild(topBar);
+        const search = Search.create();
+        document.body.appendChild(search);
         // load wiki index
         await WikiService.loadIndex();
         // content container
@@ -2428,19 +3125,18 @@ ${body}</tbody>
      */
     function setRoutes(parent) {
         if (isConfigurationActive(AppConfigurations.ShowStartPage))
-            setRoute("", HomeView.show);
+            setHomeRoute(HomeView.show);
         else
-            setRoute("", WikiView.show);
+            setHomeRoute(WikiView.show);
+        setNotFoundRoute(NotFound.show);
         setRoute("/wiki", WikiView.show);
         showRoute(window.location.hash.slice(1).toLowerCase(), parent);
-        //setNotFoundRoute(HomeView.show);
     }
     /**
      *  Start the web app
      */
     async function start() {
         setRoutes(documentContainer);
-        IndexMenu.setSelectedRoute();
     }
 
 })();
