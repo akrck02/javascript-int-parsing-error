@@ -1,4 +1,4 @@
-# Explaining the meme
+# Explaining the meme 
 Internet is made of millions of memes flowing everyday, so, devs create a ton of new images showing how their code doesn't work, 
 the server is down or even the programming language is broken or annoying. 🤔
 
